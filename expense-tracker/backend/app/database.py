@@ -1,21 +1,12 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from pymongo import MongoClient
 
-DATABASE_URL = "postgresql://postgres:password@localhost/expense_tracker"
+# MongoDB connection string
+# MONGO_URL = "mongodb://localhost:27017"  # For local MongoDB
+MONGO_URL = "mongodb+srv://MarquanB:Kairo915!@cluster0.wsgra.mongodb.net/"  # For MongoDB Atlas
 
-#create the database engine
-engine = create_engine(DATABASE_URL)
+client = MongoClient(MONGO_URL)
+db = client['expense_tracker']  # Database name
 
-#create a session for database interaction
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-#Base class for model definitions
-Base = declarative_base()
-
-#dependency to use in API routes
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Access collections
+users_collection = db['users']
+expenses_collection = db['expenses']
