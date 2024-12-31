@@ -13,7 +13,7 @@ class User(Base):
     expenses = relationship("Expense", back_populates="owner")
 
 class Expense(Base):
-     __tablename__ = "expenses"
+    __tablename__ = "expenses"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
