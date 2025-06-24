@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://<username>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority")
+MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["expenses_db"]
 collection = db["expenses"]
@@ -32,6 +32,41 @@ def delete_expense(id):
     if result.deleted_count == 1:
         return ("", 204)
     return ("Not Found", 404)
+
+@app.route("/budget", methods=["GET"])
+def get_budget():
+    budget = db["budget"].find_one({})
+    if budget:
+        budget["_id"] = str(budget["_id"])
+        return jsonify(budget)
+    return jsonify({"budget": 0}), 200
+
+@app.route("/budget", methods=["POST"])
+def set_budget():
+    data = request.json
+    amount = data.get("budget", 0)
+    db["budget"].delete_many({})
+    db["budget"].insert_one({"budget": amount})
+    return jsonify({"budget": amount}), 201
+
+@app.route("/summary", methods=["GET"])
+def get_summary():
+    from datetime import datetime
+    now = datetime.now()
+    first_day = datetime(now.year, now.month, 1)
+
+    expenses = list(collection.find({"date": {"$gte": first_day.strftime("%Y-%m-%d")}}))
+
+    total = sum(float(e["amount"]) for e in expenses)
+    budget_doc = db["budget"].find_one({})
+    budget = budget_doc["budget"] if budget_doc else 0
+
+    return jsonify({
+        "total": total,
+        "budget": budget,
+        "remaining": budget - total,
+        "percentage_used": round(total / budget * 100, 2) if budget else 0,
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)
