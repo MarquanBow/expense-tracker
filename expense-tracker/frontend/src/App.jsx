@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import "./index.css"; // Ensure you have Tailwind CSS set up
 
-const API = "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL 
 
 export default function App() {
   const [expenses, setExpenses] = useState([]);
@@ -37,7 +37,7 @@ export default function App() {
     setExpenses(res.data);
     setSummary(sumRes.data);
   };
-  
+
 return (
     <div className="container">
       <div>
