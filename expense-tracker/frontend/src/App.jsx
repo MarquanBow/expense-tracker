@@ -11,29 +11,22 @@ export default function App() {
 
   useEffect(() => {
     axios.get(`${API}/expenses`).then((res) => setExpenses(res.data));
+    axios.get(`${API}/budget`).then((res) => setBudget(res.data));
+    axios.get(`${API}/summary`).then((res) => setSummary(res.data));
   }, []);
-
-  useEffect(() => {
-    axios.get("/expenses").then((res) => setExpenses(res.data));
-    axios.get("/budget").then((res) => setBudget(res.data));
-    axios.get("/summary").then((res) => setSummary(res.data));
-  })
 
   const addExpense = async () => {
     await axios.post(`${API}/expenses`, form);
     const res = await axios.get(`${API}/expenses`);
+    const sumRes = await axios.get(`${API}/summary`);
     setExpenses(res.data);
-  };
-
-  const deleteExpense = async (id) => {
-    await axios.delete(`${API}/expenses/${id}`);
-    setExpenses(expenses.filter((e) => e.id !== id));
+    setSummary(sumRes.data);
   };
 
   const updateBudget = async () => {
-    await axios.post("/budget", { budget});
-    const res = await axios.get("/summary");
-    setSummary(res.data);
+    await axios.post(`${API}/budget`, { budget});
+    const sumRes = await axios.get(`${API}/summary`);
+    setSummary(sumRes.data);
   }
 
   return (
