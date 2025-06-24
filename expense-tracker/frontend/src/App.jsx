@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import "./index.css"; // Ensure you have Tailwind CSS set up
 
 const API = "http://localhost:5000";
 
@@ -29,46 +30,104 @@ export default function App() {
     setSummary(sumRes.data);
   }
 
-  return (
-    <div className="p-4">
-      <h1>Expense Tracker</h1>
-
-      {/* ⬇️ Budget UI Section */}
+   const deleteExpense = async (id) => {
+    await axios.delete(`${API}/expenses/${id}`);
+    const res = await axios.get(`${API}/expenses`);
+    const sumRes = await axios.get(`${API}/summary`);
+    setExpenses(res.data);
+    setSummary(sumRes.data);
+  };
+  
+return (
+    <div className="container">
       <div>
-        <h2>Monthly Budget</h2>
-        <input
-          type="number"
-          value={budget}
-          onChange={(e) => setBudget(Number(e.target.value))}
-        />
-        <button onClick={updateBudget}>Set Budget</button>
-      </div>
+        <h1>💸 Expense Tracker</h1>
 
-      <div>
-        <h3>Summary</h3>
-        <p>Total Spent: ${summary.total}</p>
-        <p>Remaining: ${summary.remaining}</p>
-        <p>Used: {summary.percent_used}%</p>
-        {summary.percent_used > 90 && (
-          <p style={{ color: "red" }}>⚠️ Near Budget Limit!</p>
-        )}
-      </div>
+        {/* Budget Section */}
+        <div>
+          <h2>Set Monthly Budget</h2>
+          <div>
+            <input
+              type="number"
+              value={budget}
+              onChange={(e) => setBudget(Number(e.target.value))}
+            />
+            <button
+              onClick={updateBudget}
+            >
+              Save
+            </button>
+          </div>
+        </div>
 
-      {/* ⬇️ Expense Form and List */}
-      <div>
-        <input placeholder="Name" onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input placeholder="Amount" type="number" onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-        <input placeholder="Category" onChange={(e) => setForm({ ...form, category: e.target.value })} />
-        <input placeholder="Date" type="date" onChange={(e) => setForm({ ...form, date: e.target.value })} />
-        <button onClick={addExpense}>Add</button>
+        {/* Summary Section */}
+        <div>
+          <h3>Summary</h3>
+          <p>Total Spent: <strong>${summary.total}</strong></p>
+          <p>Remaining: <strong>${summary.remaining}</strong></p>
+          <p>
+            Used: <strong>
+              {summary.percent_used}%
+            </strong>
+          </p>
+          {summary.percent_used > 90 && (
+            <p>⚠️ You’re nearing your budget!</p>
+          )}
+        </div>
 
-        <ul>
-          {expenses.map((e) => (
-            <li key={e._id}>
-              {e.name} - ${e.amount} - {e.category} - {e.date}
-            </li>
-          ))}
-        </ul>
+        {/* Expense Form */}
+        <div>
+          <h2>Add New Expense</h2>
+          <div>
+            <input
+              placeholder="Name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+            <input
+              placeholder="Amount"
+              type="number"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            />
+            <input
+              placeholder="Category"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            />
+            <input
+              placeholder="Date"
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+            />
+          </div>
+          <button
+            onClick={addExpense}
+          >
+            Add Expense
+          </button>
+        </div>
+
+        {/* Expense List */}
+        <div>
+          <h2>All Expenses</h2>
+          <ul>
+            {expenses.map((e) => (
+              <li key={e._id}>
+                <div>
+                  <p>{e.name} - ${e.amount}</p>
+                  <p>{e.category} | {e.date}</p>
+                </div>
+                <button
+                  onClick={() => deleteExpense(e._id)}
+                >
+                  🗑️
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
