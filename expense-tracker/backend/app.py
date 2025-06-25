@@ -1,68 +1,92 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort
 from flask_cors import CORS
+import firebase_admin
+from firebase_admin import credentials, auth as firebase_auth
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import os
 
-# === Config ===
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-client = MongoClient(MONGO_URI)
-db = client["expenses_db"]
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# === Expenses Routes ===
+# Initialize Firebase Admin
+cred = credentials.Certificate("firebase-adminsdk.json")  # 👈 you'll upload this file separately
+firebase_admin.initialize_app(cred)
+
+# Connect to MongoDB
+client = MongoClient(os.getenv("MONGO_URI"))
+db = client["expenses_db"]
+
+# Verify token and get UID
+def verify_token():
+    header = request.headers.get("Authorization")
+    if not header or not header.startswith("Bearer "):
+        abort(401, "Unauthorized: Missing or malformed token")
+    token = header.split(" ")[1]
+    try:
+        decoded = firebase_auth.verify_id_token(token)
+        return decoded["uid"]
+    except Exception as e:
+        abort(401, f"Token verification failed: {str(e)}")
+
+# Routes
 @app.route("/expenses", methods=["GET"])
 def get_expenses():
-    expenses = []
-    for expense in db.expenses.find():
-        expense["_id"] = str(expense["_id"])
-        expenses.append(expense)
+    uid = verify_token()
+    expenses = list(db.expenses.find({"userId": uid}))
+    for e in expenses:
+        e["_id"] = str(e["_id"])
     return jsonify(expenses)
 
 @app.route("/expenses", methods=["POST"])
 def add_expense():
+    uid = verify_token()
     data = request.get_json()
-    result = db.expenses.insert_one(data)
-    return jsonify({"inserted_id": str(result.inserted_id)})
+    data["userId"] = uid
+    db.expenses.insert_one(data)
+    return jsonify({"message": "Expense added"}), 201
 
 @app.route("/expenses/<expense_id>", methods=["DELETE"])
 def delete_expense(expense_id):
-    result = db.expenses.delete_one({"_id": ObjectId(expense_id)})
-    if result.deleted_count == 0:
-        return jsonify({"error": "Expense not found"}), 404
-    return jsonify({"deleted": True})
+    uid = verify_token()
+    db.expenses.delete_one({"_id": ObjectId(expense_id), "userId": uid})
+    return jsonify({"message": "Expense deleted"}), 200
 
-# === Budget Routes ===
 @app.route("/budget", methods=["GET"])
 def get_budget():
-    budget = db.budget.find_one()
-    return jsonify(budget.get("amount", 0) if budget else 0)
+    uid = verify_token()
+    doc = db.budgets.find_one({"userId": uid})
+    return jsonify(doc["budget"] if doc else 0)
 
 @app.route("/budget", methods=["POST"])
 def set_budget():
+    uid = verify_token()
     data = request.get_json()
-    amount = data.get("budget", 0)
-    db.budget.delete_many({})  # ensure only one
-    db.budget.insert_one({"amount": amount})
-    return jsonify({"budget": amount})
+    db.budgets.update_one(
+        {"userId": uid},
+        {"$set": {"budget": data["budget"]}},
+        upsert=True
+    )
+    return jsonify({"message": "Budget set"}), 200
 
-# === Summary Route ===
 @app.route("/summary", methods=["GET"])
 def get_summary():
-    total = sum(float(e.get("amount", 0)) for e in db.expenses.find())
-    budget_doc = db.budget.find_one()
-    budget = budget_doc.get("amount", 0) if budget_doc else 0
-    remaining = budget - total
-    percent_used = round((total / budget) * 100, 2) if budget else 0
+    uid = verify_token()
+    expenses = list(db.expenses.find({"userId": uid}))
+    total = sum(float(e["amount"]) for e in expenses)
+    budget_doc = db.budgets.find_one({"userId": uid})
+    budget = float(budget_doc["budget"]) if budget_doc else 0
+    remaining = max(budget - total, 0)
+    percent = round((total / budget * 100), 2) if budget else 0
+    return jsonify({"total": total, "remaining": remaining, "percent_used": percent})
 
-    return jsonify({
-        "total": total,
-        "remaining": remaining,
-        "percent_used": percent_used
-    })
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"message": "Backend running!"})
 
-# === Run App (Only Locally) ===
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=8080)
