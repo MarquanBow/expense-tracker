@@ -1,9 +1,7 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
 
-DATABASE_URL = "sqlite:///./expense_tracker.db"
+MONGO_URI = os.environ.get("MONGO_URI", "your-local-or-default-connection")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()   
+client = AsyncIOMotorClient(MONGO_URI)
+db = client.expenses_db

@@ -4,74 +4,65 @@ from pymongo import MongoClient
 from bson.objectid import ObjectId
 import os
 
+# === Config ===
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+client = MongoClient(MONGO_URI)
+db = client["expenses_db"]
+
 app = Flask(__name__)
 CORS(app)
 
-MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI)
-db = client["expenses_db"]
-collection = db["expenses"]
-
+# === Expenses Routes ===
 @app.route("/expenses", methods=["GET"])
 def get_expenses():
     expenses = []
-    for expense in collection.find():
-        expense["_id"] = str(expense["_id"])  # Convert ObjectId to string
+    for expense in db.expenses.find():
+        expense["_id"] = str(expense["_id"])
         expenses.append(expense)
     return jsonify(expenses)
 
 @app.route("/expenses", methods=["POST"])
 def add_expense():
-    data = request.json
-    result = collection.insert_one(data)
-    return jsonify({"_id": str(result.inserted_id)}), 201
+    data = request.get_json()
+    result = db.expenses.insert_one(data)
+    return jsonify({"inserted_id": str(result.inserted_id)})
 
-@app.route("/expenses/<id>", methods=["DELETE"])
-def delete_expense(id):
-    result = collection.delete_one({"_id": ObjectId(id)})
-    if result.deleted_count == 1:
-        return ("", 204)
-    return ("Not Found", 404)
+@app.route("/expenses/<expense_id>", methods=["DELETE"])
+def delete_expense(expense_id):
+    result = db.expenses.delete_one({"_id": ObjectId(expense_id)})
+    if result.deleted_count == 0:
+        return jsonify({"error": "Expense not found"}), 404
+    return jsonify({"deleted": True})
 
+# === Budget Routes ===
 @app.route("/budget", methods=["GET"])
 def get_budget():
-    budget = db["budget"].find_one({})
-    if budget:
-        budget["_id"] = str(budget["_id"])
-        return jsonify(budget)
-    return jsonify({"budget": 0}), 200
+    budget = db.budget.find_one()
+    return jsonify(budget.get("amount", 0) if budget else 0)
 
 @app.route("/budget", methods=["POST"])
 def set_budget():
-    data = request.json
+    data = request.get_json()
     amount = data.get("budget", 0)
-    db["budget"].delete_many({})
-    db["budget"].insert_one({"budget": amount})
-    return jsonify({"budget": amount}), 201
+    db.budget.delete_many({})  # ensure only one
+    db.budget.insert_one({"amount": amount})
+    return jsonify({"budget": amount})
 
+# === Summary Route ===
 @app.route("/summary", methods=["GET"])
 def get_summary():
-    from datetime import datetime
-    now = datetime.now()
-    first_day = datetime(now.year, now.month, 1)
-
-    expenses = list(collection.find({"date": {"$gte": first_day.strftime("%Y-%m-%d")}}))
-
-    total = sum(float(e["amount"]) for e in expenses)
-    budget_doc = db["budget"].find_one({})
-    budget = budget_doc["budget"] if budget_doc else 0
+    total = sum(float(e.get("amount", 0)) for e in db.expenses.find())
+    budget_doc = db.budget.find_one()
+    budget = budget_doc.get("amount", 0) if budget_doc else 0
+    remaining = budget - total
+    percent_used = round((total / budget) * 100, 2) if budget else 0
 
     return jsonify({
         "total": total,
-        "budget": budget,
-        "remaining": budget - total,
-        "percentage_used": round(total / budget * 100, 2) if budget else 0,
+        "remaining": remaining,
+        "percent_used": percent_used
     })
 
+# === Run App (Only Locally) ===
 if __name__ == "__main__":
     app.run(debug=True)
-
-if __name__ == '__main__':
-    import os
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
