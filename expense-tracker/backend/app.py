@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, abort
+from flask import Flask, json, request, jsonify, abort
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, auth as firebase_auth
@@ -14,7 +14,8 @@ app = Flask(__name__)
 CORS(app)
 
 # Initialize Firebase Admin
-cred = credentials.Certificate("firebase-adminsdk.json")  # 👈 you'll upload this file separately
+cred_json = json.loads(os.getenv("FIREBASE_ADMIN_JSON"))
+cred = credentials.Certificate(cred_json)
 firebase_admin.initialize_app(cred)
 
 # Connect to MongoDB
