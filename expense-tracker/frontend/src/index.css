@@ -38,6 +38,20 @@ button {
   color: white;
   border: none;
   cursor: pointer;
+  margin-top: 1rem;  /* add spacing above all buttons */
+}
+
+button + button {
+  margin-left: 1rem; /* horizontal space between side-by-side buttons */
+}
+
+button:not(:last-child) {
+  margin-bottom: 1rem;
+}
+
+.auth-buttons button {
+  margin-top: 1rem;
+  margin-right: 1rem; /* space out horizontally if side by side */
 }
 
 button:hover {
